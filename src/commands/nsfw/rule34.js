@@ -95,7 +95,7 @@ async function fetchRule34Posts(tags, limit = 50) {
     return [];
   }
 
-  /** @type {Rule34Post[] | Rule34ErrorResponse | null} */
+  /** @type {Rule34Post[] | Rule34ErrorResponse | { post?: Rule34Post | Rule34Post[]; posts?: Rule34Post[] } | string | null} */
   let payload;
 
   try {
@@ -109,8 +109,26 @@ async function fetchRule34Posts(tags, limit = 50) {
     return payload;
   }
 
+  if (typeof payload === 'string') {
+    throw new Error(payload);
+  }
+
   if (payload && typeof payload === 'object' && 'success' in payload && payload.success === 'false') {
     throw new Error(payload.message ?? 'Rule34 API reported search failure.');
+  }
+
+  if (payload && typeof payload === 'object') {
+    if (Array.isArray(payload.posts)) {
+      return payload.posts;
+    }
+
+    if (Array.isArray(payload.post)) {
+      return payload.post;
+    }
+
+    if (payload.post && typeof payload.post === 'object') {
+      return [payload.post];
+    }
   }
 
   throw new Error('Unexpected Rule34 API response format.');
