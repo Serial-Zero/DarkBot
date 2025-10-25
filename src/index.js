@@ -1,19 +1,45 @@
+import { existsSync } from 'fs';
 import { config as loadEnv } from 'dotenv';
-import { dirname, join } from 'path';
+import { dirname, join, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { Client, Events, GatewayIntentBits } from 'discord.js';
 import { handleNSFWCommand } from './handlers/nsfwHandler.js';
 import { refreshCommands } from './handlers/commandRefreshHandler.js';
 import { commandMap } from './commands/index.js';
 
-// Ensure .env loads relative to the project root, regardless of process cwd.
 const moduleDir = dirname(fileURLToPath(import.meta.url));
-loadEnv({ path: join(moduleDir, '..', '.env') });
+const projectRoot = resolve(moduleDir, '..');
+const envCandidates = [
+  join(projectRoot, '.env'),
+  join(process.cwd(), '.env'),
+];
+
+let envLoadedFrom;
+
+for (const candidate of envCandidates) {
+  if (!existsSync(candidate)) {
+    continue;
+  }
+
+  const result = loadEnv({ path: candidate, override: false });
+
+  if (!result.error && process.env.DISCORD_BOT_TOKEN) {
+    envLoadedFrom = candidate;
+    break;
+  }
+}
+
+if (!envLoadedFrom) {
+  loadEnv(); // fallback to default lookup
+}
 
 const token = process.env.DISCORD_BOT_TOKEN;
 
 if (!token) {
-  throw new Error('Missing DISCORD_BOT_TOKEN environment variable.');
+  const searchedPaths = envCandidates.join(', ');
+  throw new Error(
+    `Missing DISCORD_BOT_TOKEN environment variable. Looked for .env in: ${searchedPaths}. Ensure the variable is set via your hosting provider or present in one of those files.`,
+  );
 }
 
 const client = new Client({
