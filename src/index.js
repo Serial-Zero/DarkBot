@@ -1,8 +1,14 @@
-import 'dotenv/config';
+import { config as loadEnv } from 'dotenv';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
 import { Client, Events, GatewayIntentBits } from 'discord.js';
 import { handleNSFWCommand } from './handlers/nsfwHandler.js';
 import { refreshCommands } from './handlers/commandRefreshHandler.js';
 import { commandMap } from './commands/index.js';
+
+// Ensure .env loads relative to the project root, regardless of process cwd.
+const moduleDir = dirname(fileURLToPath(import.meta.url));
+loadEnv({ path: join(moduleDir, '..', '.env') });
 
 const token = process.env.DISCORD_BOT_TOKEN;
 
