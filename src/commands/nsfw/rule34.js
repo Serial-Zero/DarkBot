@@ -100,6 +100,17 @@ async function fetchRule34Posts(tags, limit = 50) {
     params.set('api_key', RULE34_API_KEY);
   }
 
+  const debugParams = Object.fromEntries(
+    Array.from(params.entries()).map(([key, value]) => {
+      if (key === 'api_key') {
+        return [key, `${value.slice(0, 6)}…`];
+      }
+      return [key, value];
+    }),
+  );
+
+  console.info('[Rule34] Requesting posts with params', debugParams);
+
   const response = await fetch(`${RULE34_API_BASE_URL}?${params.toString()}`, {
     headers: {
       'User-Agent': 'DarkBot (Discord Bot)',
