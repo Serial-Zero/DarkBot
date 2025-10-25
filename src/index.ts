@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { Client, Events, GatewayIntentBits } from 'discord.js';
 import type { InteractionReplyOptions } from 'discord.js';
 import { handleNSFWCommand } from './handlers/nsfwHandler';
+import { refreshCommands } from './handlers/commandRefreshHandler';
 
 const token = process.env.DISCORD_BOT_TOKEN;
 
@@ -17,8 +18,14 @@ const client = new Client({
   ],
 });
 
-client.once(Events.ClientReady, (readyClient) => {
+client.once(Events.ClientReady, async (readyClient) => {
   console.log(`Logged in as ${readyClient.user.tag}`);
+
+  try {
+    await refreshCommands();
+  } catch (error) {
+    console.error('Command refresh failed during startup.', error);
+  }
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {
