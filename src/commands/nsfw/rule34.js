@@ -42,6 +42,14 @@ const RULE34_LOGIN =
   '';
 const RULE34_API_KEY = process.env.R34_API_KEY ?? process.env.RULE34_API_KEY ?? '';
 
+const credentialSummary = {
+  apiKey: RULE34_API_KEY ? `${RULE34_API_KEY.length} chars` : 'missing',
+  userId: RULE34_USER_ID ? 'present' : 'missing',
+  login: RULE34_LOGIN ? 'present' : 'missing',
+};
+
+console.info('[Rule34] Credential summary', credentialSummary);
+
 /**
  * @param {string[]} rawTags
  * @returns {string[]}
@@ -274,7 +282,14 @@ async function execute(interaction) {
       embeds: [embed],
     });
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred.';
+    let errorMessage = error instanceof Error ? error.message : 'Unknown error occurred.';
+
+    if (/missing authentication/i.test(errorMessage)) {
+      errorMessage =
+        'Authentication failed. Ensure R34_API_KEY and R34_USER_ID come from the same Rule34 account ' +
+        'and are configured on the hosting environment (login is optional but recommended).';
+    }
+
     await interaction.editReply({
       content: `Failed to fetch Rule34 content: ${errorMessage}`,
     });
