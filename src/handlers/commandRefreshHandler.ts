@@ -1,12 +1,9 @@
-import { REST, Routes, SlashCommandBuilder, type RESTPostAPIChatInputApplicationCommandsJSONBody } from 'discord.js';
+import { REST, Routes, type RESTPostAPIChatInputApplicationCommandsJSONBody } from 'discord.js';
+import { commandModules } from '../commands';
 
-const commands: RESTPostAPIChatInputApplicationCommandsJSONBody[] = [
-  new SlashCommandBuilder()
-    .setName('nsfw-example')
-    .setDescription('Demonstration command restricted to NSFW channels.')
-    .setNSFW(true)
-    .toJSON(),
-];
+const commands: RESTPostAPIChatInputApplicationCommandsJSONBody[] = commandModules.map((command) =>
+  command.data.toJSON()
+);
 
 export async function refreshCommands(): Promise<void> {
   const token = process.env.DISCORD_BOT_TOKEN;
