@@ -34,6 +34,12 @@ import { EmbedBuilder, SlashCommandBuilder } from 'discord.js';
 const RULE34_API_BASE_URL = 'https://api.rule34.xxx/index.php';
 const RULE34_AUTOCOMPLETE_URL = 'https://api.rule34.xxx/autocomplete.php';
 const RULE34_USER_ID = process.env.R34_USER_ID ?? process.env.RULE34_USER_ID ?? '';
+const RULE34_LOGIN =
+  process.env.R34_LOGIN ??
+  process.env.R34_USERNAME ??
+  process.env.RULE34_LOGIN ??
+  process.env.RULE34_USERNAME ??
+  '';
 const RULE34_API_KEY = process.env.R34_API_KEY ?? process.env.RULE34_API_KEY ?? '';
 
 /**
@@ -74,8 +80,15 @@ async function fetchRule34Posts(tags, limit = 50) {
     tags: tags.join(' '),
   });
 
-  if (RULE34_USER_ID && RULE34_API_KEY) {
-    params.set('user_id', RULE34_USER_ID);
+  if (RULE34_API_KEY) {
+    if (RULE34_LOGIN) {
+      params.set('login', RULE34_LOGIN);
+    }
+
+    if (RULE34_USER_ID) {
+      params.set('user_id', RULE34_USER_ID);
+    }
+
     params.set('api_key', RULE34_API_KEY);
   }
 
