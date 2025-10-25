@@ -1,8 +1,8 @@
 import 'dotenv/config';
 import { Client, Events, GatewayIntentBits } from 'discord.js';
-import { handleNSFWCommand } from './handlers/nsfwHandler';
-import { refreshCommands } from './handlers/commandRefreshHandler';
-import { commandMap } from './commands';
+import { handleNSFWCommand } from './handlers/nsfwHandler.js';
+import { refreshCommands } from './handlers/commandRefreshHandler.js';
+import { commandMap } from './commands/index.js';
 
 const token = process.env.DISCORD_BOT_TOKEN;
 

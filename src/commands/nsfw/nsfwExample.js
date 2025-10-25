@@ -1,8 +1,13 @@
-import type { ChatInputCommandInteraction } from 'discord.js';
 import { SlashCommandBuilder } from 'discord.js';
-import type { CommandModule } from '../types';
+/**
+ * @typedef {import('discord.js').ChatInputCommandInteraction} ChatInputCommandInteraction
+ * @typedef {import('../types.js').CommandModule} CommandModule
+ */
 
-async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
+/**
+ * @param {ChatInputCommandInteraction} interaction
+ */
+async function execute(interaction) {
   if (interaction.deferred || interaction.replied) {
     await interaction.followUp({
       content: 'This is an NSFW-only command.',
@@ -14,7 +19,8 @@ async function execute(interaction: ChatInputCommandInteraction): Promise<void> 
   }
 }
 
-export const nsfwExampleCommand: CommandModule = {
+/** @type {CommandModule} */
+export const nsfwExampleCommand = {
   data: new SlashCommandBuilder()
     .setName('nsfw-example')
     .setDescription('Demonstration command restricted to NSFW channels.')

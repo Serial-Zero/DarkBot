@@ -1,11 +1,10 @@
-import { REST, Routes, type RESTPostAPIChatInputApplicationCommandsJSONBody } from 'discord.js';
-import { commandModules } from '../commands';
+import { REST, Routes } from 'discord.js';
+import { commandModules } from '../commands/index.js';
 
-const commands: RESTPostAPIChatInputApplicationCommandsJSONBody[] = commandModules.map((command) =>
-  command.data.toJSON()
-);
+/** @type {import('discord.js').RESTPostAPIChatInputApplicationCommandsJSONBody[]} */
+const commands = commandModules.map((command) => command.data.toJSON());
 
-export async function refreshCommands(): Promise<void> {
+export async function refreshCommands() {
   const token = process.env.DISCORD_BOT_TOKEN;
   const clientId = process.env.DISCORD_CLIENT_ID;
   const guildId = process.env.DISCORD_GUILD_ID;

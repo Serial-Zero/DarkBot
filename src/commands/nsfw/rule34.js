@@ -1,40 +1,47 @@
-import {
-  AutocompleteInteraction,
-  ChatInputCommandInteraction,
-  EmbedBuilder,
-  SlashCommandBuilder,
-} from 'discord.js';
-import type { CommandModule } from '../types';
+import { EmbedBuilder, SlashCommandBuilder } from 'discord.js';
 
-interface Rule34Post {
-  id: number;
-  file_url?: string;
-  sample_url?: string;
-  preview_url?: string;
-  rating?: string;
-  score?: number;
-  tags?: string;
-  owner?: string;
-  source?: string;
-}
+/**
+ * @typedef {import('discord.js').AutocompleteInteraction} AutocompleteInteraction
+ * @typedef {import('discord.js').ChatInputCommandInteraction} ChatInputCommandInteraction
+ * @typedef {import('../types.js').CommandModule} CommandModule
+ */
 
-interface Rule34ErrorResponse {
-  success: 'false' | false;
-  message?: string;
-}
+/**
+ * @typedef {Object} Rule34Post
+ * @property {number} id
+ * @property {string} [file_url]
+ * @property {string} [sample_url]
+ * @property {string} [preview_url]
+ * @property {string} [rating]
+ * @property {number} [score]
+ * @property {string} [tags]
+ * @property {string} [owner]
+ * @property {string} [source]
+ */
 
-interface Rule34AutocompleteEntry {
-  label: string;
-  value: string;
-}
+/**
+ * @typedef {Object} Rule34ErrorResponse
+ * @property {'false' | false} success
+ * @property {string} [message]
+ */
+
+/**
+ * @typedef {Object} Rule34AutocompleteEntry
+ * @property {string} label
+ * @property {string} value
+ */
 
 const RULE34_API_BASE_URL = 'https://api.rule34.xxx/index.php';
 const RULE34_AUTOCOMPLETE_URL = 'https://api.rule34.xxx/autocomplete.php';
 const RULE34_USER_ID = process.env.R34_USER_ID ?? process.env.RULE34_USER_ID ?? '';
 const RULE34_API_KEY = process.env.R34_API_KEY ?? process.env.RULE34_API_KEY ?? '';
 
-function sanitizeTags(rawTags: string[]): string[] {
-  const seen = new Set<string>();
+/**
+ * @param {string[]} rawTags
+ * @returns {string[]}
+ */
+function sanitizeTags(rawTags) {
+  const seen = new Set();
 
   return rawTags
     .map((tag) => tag.trim().toLowerCase())
@@ -52,7 +59,12 @@ function sanitizeTags(rawTags: string[]): string[] {
     });
 }
 
-async function fetchRule34Posts(tags: string[], limit = 50): Promise<Rule34Post[]> {
+/**
+ * @param {string[]} tags
+ * @param {number} [limit=50]
+ * @returns {Promise<Rule34Post[]>}
+ */
+async function fetchRule34Posts(tags, limit = 50) {
   const params = new URLSearchParams({
     page: 'dapi',
     s: 'post',
@@ -83,10 +95,11 @@ async function fetchRule34Posts(tags: string[], limit = 50): Promise<Rule34Post[
     return [];
   }
 
-  let payload: Rule34Post[] | Rule34ErrorResponse;
+  /** @type {Rule34Post[] | Rule34ErrorResponse | null} */
+  let payload;
 
   try {
-    payload = JSON.parse(rawPayload) as Rule34Post[] | Rule34ErrorResponse;
+    payload = JSON.parse(rawPayload);
   } catch (parseError) {
     const messageSnippet = rawPayload.slice(0, 200);
     throw new Error(`Rule34 API returned malformed JSON. Payload snippet: ${messageSnippet}`);
@@ -103,7 +116,11 @@ async function fetchRule34Posts(tags: string[], limit = 50): Promise<Rule34Post[
   throw new Error('Unexpected Rule34 API response format.');
 }
 
-function pickRandomPost(posts: Rule34Post[]): Rule34Post | null {
+/**
+ * @param {Rule34Post[]} posts
+ * @returns {Rule34Post | null}
+ */
+function pickRandomPost(posts) {
   if (posts.length === 0) {
     return null;
   }
@@ -112,7 +129,12 @@ function pickRandomPost(posts: Rule34Post[]): Rule34Post | null {
   return posts[index] ?? null;
 }
 
-function createPostEmbed(post: Rule34Post, tags: string[]): EmbedBuilder {
+/**
+ * @param {Rule34Post} post
+ * @param {string[]} tags
+ * @returns {EmbedBuilder}
+ */
+function createPostEmbed(post, tags) {
   const imageUrl = post.file_url ?? post.sample_url ?? post.preview_url ?? null;
   const ratingLabel = post.rating ? post.rating.toUpperCase() : 'UNKNOWN';
   const postUrl = `https://rule34.xxx/index.php?page=post&s=view&id=${post.id}`;
@@ -172,7 +194,10 @@ const data = new SlashCommandBuilder()
     option.setName('tag5').setDescription('Optional additional tag.').setAutocomplete(true)
   );
 
-async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
+/**
+ * @param {ChatInputCommandInteraction} interaction
+ */
+async function execute(interaction) {
   const rawTags = [
     interaction.options.getString('tag1', true),
     interaction.options.getString('tag2') ?? '',
@@ -225,7 +250,10 @@ async function execute(interaction: ChatInputCommandInteraction): Promise<void> 
   }
 }
 
-async function autocomplete(interaction: AutocompleteInteraction): Promise<void> {
+/**
+ * @param {AutocompleteInteraction} interaction
+ */
+async function autocomplete(interaction) {
   const focused = interaction.options.getFocused(true);
   const query = focused.value.trim().toLowerCase();
 
@@ -247,16 +275,26 @@ async function autocomplete(interaction: AutocompleteInteraction): Promise<void>
       throw new Error(`Autocomplete endpoint returned status ${response.status}`);
     }
 
-    const suggestions = (await response.json()) as Rule34AutocompleteEntry[];
+    /** @type {unknown} */
+    const suggestions = await response.json();
 
     if (!Array.isArray(suggestions)) {
       throw new Error('Unexpected autocomplete payload.');
     }
 
-    const choices = suggestions.slice(0, 25).map((entry) => ({
-      name: entry.label,
-      value: entry.value.toLowerCase(),
-    }));
+    const choices = suggestions
+      .slice(0, 25)
+      .filter(
+        (entry) =>
+          entry &&
+          typeof entry === 'object' &&
+          typeof entry.label === 'string' &&
+          typeof entry.value === 'string'
+      )
+      .map((entry) => ({
+        name: entry.label,
+        value: entry.value.toLowerCase(),
+      }));
 
     await interaction.respond(choices);
   } catch (error) {
@@ -267,7 +305,8 @@ async function autocomplete(interaction: AutocompleteInteraction): Promise<void>
   }
 }
 
-export const rule34Command: CommandModule = {
+/** @type {CommandModule} */
+export const rule34Command = {
   data,
   requiresNSFW: true,
   execute,
