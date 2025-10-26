@@ -3,6 +3,7 @@ import {
   ensureLeaderboardTable,
   incrementLeaderboardScore,
 } from './leaderboardRepository.js';
+import { calculateLevel } from './leveling.js';
 
 let readinessLogged = false;
 
@@ -50,13 +51,39 @@ export const leaderboardEvents = [
         return;
       }
 
-      const success = await incrementLeaderboardScore(
+      const result = await incrementLeaderboardScore(
         message.guild.id,
         message.author.id,
       );
 
-      if (!success) {
+      if (!result) {
         logReadinessDisabled();
+        return;
+      }
+
+      const { currentScore, previousScore } = result;
+
+      const previousLevel = calculateLevel(previousScore);
+      const currentLevel = calculateLevel(currentScore);
+
+      if (currentLevel > previousLevel) {
+        const levelsGained = currentLevel - previousLevel;
+        const levelLine =
+          levelsGained > 1
+            ? `reached level ${currentLevel} (+${levelsGained} levels!)`
+            : `reached level ${currentLevel}!`;
+
+        try {
+          await message.channel.send({
+            content: `🎉 <@${message.author.id}> ${levelLine}`,
+            allowedMentions: { users: [message.author.id] },
+          });
+        } catch (error) {
+          console.error(
+            `[Leaderboard] Failed to announce level up for ${message.author.id}.`,
+            error,
+          );
+        }
       }
     },
   },
