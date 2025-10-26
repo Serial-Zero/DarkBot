@@ -6,6 +6,7 @@ import { Client, Events, GatewayIntentBits } from 'discord.js';
 import { handleNSFWCommand } from './handlers/nsfwHandler.js';
 import { refreshCommands } from './handlers/commandRefreshHandler.js';
 import { commandMap } from './commands/index.js';
+import { registerEvents } from './Events/index.js';
 
 const moduleDir = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(moduleDir, '..');
@@ -49,6 +50,8 @@ const client = new Client({
     GatewayIntentBits.MessageContent,
   ],
 });
+
+registerEvents(client);
 
 client.once(Events.ClientReady, async (readyClient) => {
   console.log(`Logged in as ${readyClient.user.tag}`);
