@@ -33,22 +33,46 @@ import { EmbedBuilder, SlashCommandBuilder } from 'discord.js';
 
 const RULE34_API_BASE_URL = 'https://api.rule34.xxx/index.php';
 const RULE34_AUTOCOMPLETE_URL = 'https://api.rule34.xxx/autocomplete.php';
-const RULE34_USER_ID = process.env.R34_USER_ID ?? process.env.RULE34_USER_ID ?? '';
-const RULE34_LOGIN =
-  process.env.R34_LOGIN ??
-  process.env.R34_USERNAME ??
-  process.env.RULE34_LOGIN ??
-  process.env.RULE34_USERNAME ??
-  '';
-const RULE34_API_KEY = process.env.R34_API_KEY ?? process.env.RULE34_API_KEY ?? '';
+const RULE34_USER_AGENT = 'DarkBot (Discord Bot)';
+const MAX_AUTOCOMPLETE_CHOICES = 25;
+const DEFAULT_POST_LIMIT = 50;
 
-const credentialSummary = {
-  apiKey: RULE34_API_KEY ? `${RULE34_API_KEY.length} chars` : 'missing',
-  userId: RULE34_USER_ID ? 'present' : 'missing',
-  login: RULE34_LOGIN ? 'present' : 'missing',
-};
+let credentialsLogged = false;
 
-console.info('[Rule34] Credential summary', credentialSummary);
+/**
+ * @returns {{ apiKey: string; userId: string; login: string }}
+ */
+function resolveCredentials() {
+  const credentials = {
+    apiKey: process.env.R34_API_KEY ?? process.env.RULE34_API_KEY ?? '',
+    userId: process.env.R34_USER_ID ?? process.env.RULE34_USER_ID ?? '',
+    login:
+      process.env.R34_LOGIN ??
+      process.env.R34_USERNAME ??
+      process.env.RULE34_LOGIN ??
+      process.env.RULE34_USERNAME ??
+      '',
+  };
+
+  if (!credentialsLogged) {
+    credentialsLogged = true;
+    console.info('[Rule34] Credential summary', summarizeCredentials(credentials));
+  }
+
+  return credentials;
+}
+
+/**
+ * @param {{ apiKey: string; userId: string; login: string }} credentials
+ * @returns {{ apiKey: string; userId: string; login: string }}
+ */
+function summarizeCredentials({ apiKey, userId, login }) {
+  return {
+    apiKey: apiKey ? `${apiKey.length} chars` : 'missing',
+    userId: userId ? 'present' : 'missing',
+    login: login ? 'present' : 'missing',
+  };
+}
 
 /**
  * @param {string[]} rawTags
@@ -74,11 +98,24 @@ function sanitizeTags(rawTags) {
 }
 
 /**
- * @param {string[]} tags
- * @param {number} [limit=50]
- * @returns {Promise<Rule34Post[]>}
+ * @param {string} url
+ * @param {RequestInit} [options]
+ * @returns {Promise<Response>}
  */
-async function fetchRule34Posts(tags, limit = 50) {
+function fetchWithRule34Headers(url, options = {}) {
+  const headers = new Headers(options.headers ?? {});
+  headers.set('User-Agent', RULE34_USER_AGENT);
+
+  return fetch(url, { ...options, headers });
+}
+
+/**
+ * @param {string[]} tags
+ * @param {number} limit
+ * @param {{ apiKey: string; userId: string; login: string }} credentials
+ * @returns {URLSearchParams}
+ */
+function buildPostSearchParams(tags, limit, { apiKey, userId, login }) {
   const params = new URLSearchParams({
     page: 'dapi',
     s: 'post',
@@ -88,19 +125,27 @@ async function fetchRule34Posts(tags, limit = 50) {
     tags: tags.join(' '),
   });
 
-  if (RULE34_API_KEY) {
-    if (RULE34_LOGIN) {
-      params.set('login', RULE34_LOGIN);
+  if (apiKey) {
+    if (login) {
+      params.set('login', login);
     }
 
-    if (RULE34_USER_ID) {
-      params.set('user_id', RULE34_USER_ID);
+    if (userId) {
+      params.set('user_id', userId);
     }
 
-    params.set('api_key', RULE34_API_KEY);
+    params.set('api_key', apiKey);
   }
 
-  const debugParams = Object.fromEntries(
+  return params;
+}
+
+/**
+ * @param {URLSearchParams} params
+ * @returns {Record<string, string>}
+ */
+function summarizeParamsForLog(params) {
+  return Object.fromEntries(
     Array.from(params.entries()).map(([key, value]) => {
       if (key === 'api_key') {
         return [key, `${value.slice(0, 6)}…`];
@@ -108,21 +153,13 @@ async function fetchRule34Posts(tags, limit = 50) {
       return [key, value];
     }),
   );
+}
 
-  console.info('[Rule34] Requesting posts with params', debugParams);
-
-  const response = await fetch(`${RULE34_API_BASE_URL}?${params.toString()}`, {
-    headers: {
-      'User-Agent': 'DarkBot (Discord Bot)',
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(`Rule34 API returned status ${response.status}`);
-  }
-
-  const rawPayload = await response.text();
-
+/**
+ * @param {string} rawPayload
+ * @returns {Rule34Post[]}
+ */
+function parseRule34PostPayload(rawPayload) {
   if (!rawPayload.trim()) {
     return [];
   }
@@ -164,6 +201,41 @@ async function fetchRule34Posts(tags, limit = 50) {
   }
 
   throw new Error('Unexpected Rule34 API response format.');
+}
+
+/**
+ * @param {unknown} entry
+ * @returns {entry is Rule34AutocompleteEntry}
+ */
+function isValidAutocompleteEntry(entry) {
+  return (
+    Boolean(entry) &&
+    typeof entry === 'object' &&
+    typeof /** @type {Record<string, unknown>} */ (entry).label === 'string' &&
+    typeof /** @type {Record<string, unknown>} */ (entry).value === 'string'
+  );
+}
+
+/**
+ * @param {string[]} tags
+ * @param {number} [limit=DEFAULT_POST_LIMIT]
+ * @returns {Promise<Rule34Post[]>}
+ */
+async function fetchRule34Posts(tags, limit = DEFAULT_POST_LIMIT) {
+  const credentials = resolveCredentials();
+  const params = buildPostSearchParams(tags, limit, credentials);
+
+  console.info('[Rule34] Requesting posts with params', summarizeParamsForLog(params));
+
+  const response = await fetchWithRule34Headers(`${RULE34_API_BASE_URL}?${params.toString()}`);
+
+  if (!response.ok) {
+    throw new Error(`Rule34 API returned status ${response.status}`);
+  }
+
+  const rawPayload = await response.text();
+
+  return parseRule34PostPayload(rawPayload);
 }
 
 /**
@@ -322,11 +394,7 @@ async function autocomplete(interaction) {
   const encodedQuery = encodeURIComponent(query);
 
   try {
-    const response = await fetch(`${RULE34_AUTOCOMPLETE_URL}?q=${encodedQuery}`, {
-      headers: {
-        'User-Agent': 'DarkBot (Discord Bot)',
-      },
-    });
+    const response = await fetchWithRule34Headers(`${RULE34_AUTOCOMPLETE_URL}?q=${encodedQuery}`);
 
     if (!response.ok) {
       throw new Error(`Autocomplete endpoint returned status ${response.status}`);
@@ -340,14 +408,8 @@ async function autocomplete(interaction) {
     }
 
     const choices = suggestions
-      .slice(0, 25)
-      .filter(
-        (entry) =>
-          entry &&
-          typeof entry === 'object' &&
-          typeof entry.label === 'string' &&
-          typeof entry.value === 'string'
-      )
+      .filter(isValidAutocompleteEntry)
+      .slice(0, MAX_AUTOCOMPLETE_CHOICES)
       .map((entry) => ({
         name: entry.label,
         value: entry.value.toLowerCase(),
