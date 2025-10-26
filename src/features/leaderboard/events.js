@@ -2,7 +2,7 @@ import { Events } from 'discord.js';
 import {
   ensureLeaderboardTable,
   incrementLeaderboardScore,
-} from './leaderboardRepository.js';
+} from './repository.js';
 import { calculateLevel } from './leveling.js';
 
 let readinessLogged = false;

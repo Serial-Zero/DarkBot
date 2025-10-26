@@ -1,6 +1,8 @@
-import { leaderboardEvents } from './Leaderbored/index.js';
+import { leaderboardEvents } from '../features/leaderboard/events.js';
 
-export const eventModules = [...leaderboardEvents];
+const eventGroups = [leaderboardEvents];
+
+export const eventModules = eventGroups.flat();
 
 /**
  * @param {import('discord.js').Client} client

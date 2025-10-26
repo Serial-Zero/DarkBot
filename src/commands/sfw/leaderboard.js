@@ -10,13 +10,13 @@ import {
   countLeaderboardEntries,
   fetchLeaderboardEntries,
   fetchLeaderboardStanding,
-} from '../../Events/Leaderbored/leaderboardRepository.js';
+} from '../../features/leaderboard/repository.js';
 import {
   BASE_LEVEL_XP,
   LEVEL_XP_GROWTH,
   calculateLevel,
   getLevelProgress,
-} from '../../Events/Leaderbored/leveling.js';
+} from '../../features/leaderboard/leveling.js';
 
 const DEFAULT_PAGE_SIZE = 10;
 const MAX_PAGE_SIZE = 25;

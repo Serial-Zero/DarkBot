@@ -1,10 +1,10 @@
 import { EmbedBuilder, SlashCommandBuilder } from 'discord.js';
-import { fetchLeaderboardStanding } from '../../Events/Leaderbored/leaderboardRepository.js';
+import { fetchLeaderboardStanding } from '../../features/leaderboard/repository.js';
 import {
   BASE_LEVEL_XP,
   LEVEL_XP_GROWTH,
   getLevelProgress,
-} from '../../Events/Leaderbored/leveling.js';
+} from '../../features/leaderboard/leveling.js';
 
 function formatNumber(value) {
   return new Intl.NumberFormat().format(value);

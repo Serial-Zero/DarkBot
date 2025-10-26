@@ -6,7 +6,7 @@ import { Client, Events, GatewayIntentBits } from 'discord.js';
 import { handleNSFWCommand } from './handlers/nsfwHandler.js';
 import { refreshCommands } from './handlers/commandRefreshHandler.js';
 import { commandMap } from './commands/index.js';
-import { registerEvents } from './Events/index.js';
+import { registerEvents } from './events/index.js';
 
 const moduleDir = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(moduleDir, '..');

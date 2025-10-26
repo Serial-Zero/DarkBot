@@ -1,4 +1,4 @@
-import { getLeaderboardPool } from './dbClient.js';
+import { getLeaderboardPool } from './db/client.js';
 
 let ensureTablePromise = null;
 
