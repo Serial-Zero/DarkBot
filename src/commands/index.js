@@ -1,17 +1,21 @@
 /** @typedef {import('./types.js').CommandModule} CommandModule */
 
 import { adminCommands } from './admin/index.js';
-import { nsfwCommands } from './nsfw/index.js';
-import { sfwCommands } from './sfw/index.js';
+import { imageCommands } from './images/index.js';
+import { leaderboardCommands } from './leaderboard/index.js';
+import { levelingCommands } from './leveling/index.js';
+import { statusCommands } from './status/index.js';
 
 /** @type {CommandModule[]} */
 export const commandModules = [
-  ...nsfwCommands,
+  ...imageCommands,
   ...adminCommands,
-  ...sfwCommands,
+  ...leaderboardCommands,
+  ...levelingCommands,
+  ...statusCommands,
 ];
 
 /** @type {Map<string, CommandModule>} */
 export const commandMap = new Map(
-  commandModules.map((command) => [command.data.name, command])
+  commandModules.map((command) => [command.data.name, command]),
 );

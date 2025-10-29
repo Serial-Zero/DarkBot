@@ -43,8 +43,8 @@ export const afkCommand = {
 
       await interaction.reply({
         content: status.message
-          ? `🔕 <@${user.id}> is now AFK: ${status.message}`
-          : `🔕 <@${user.id}> is now AFK.`,
+          ? `\u{1F515} <@${user.id}> is now AFK: ${status.message}`
+          : `\u{1F515} <@${user.id}> is now AFK.`,
         allowedMentions: { users: [user.id] },
       });
       return;
@@ -68,3 +68,4 @@ export const afkCommand = {
     });
   },
 };
+

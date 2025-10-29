@@ -3,7 +3,7 @@ import { EmbedBuilder, SlashCommandBuilder } from 'discord.js';
 /**
  * @typedef {import('discord.js').AutocompleteInteraction} AutocompleteInteraction
  * @typedef {import('discord.js').ChatInputCommandInteraction} ChatInputCommandInteraction
- * @typedef {import('../types.js').CommandModule} CommandModule
+ * @typedef {import('../../types.js').CommandModule} CommandModule
  */
 
 /**

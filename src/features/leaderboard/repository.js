@@ -1,4 +1,5 @@
 import { getLeaderboardPool } from './db/client.js';
+import { messageXpForScore } from './leveling.js';
 
 let ensureTablePromise = null;
 
@@ -55,7 +56,7 @@ export async function ensureLeaderboardTable() {
  * @param {number} [increment]
  * @returns {Promise<{ currentScore: number; previousScore: number; increment: number } | null>}
  */
-export async function incrementLeaderboardScore(guildId, userId, increment = 1) {
+export async function incrementLeaderboardScore(guildId, userId, increment) {
   if (!guildId || !userId) {
     return null;
   }
@@ -72,7 +73,33 @@ export async function incrementLeaderboardScore(guildId, userId, increment = 1) 
     return null;
   }
 
-  const normalizedIncrement = Number.isFinite(increment) ? Math.max(1, Math.trunc(increment)) : 1;
+  let previousScore = 0;
+
+  try {
+    const [[existing]] = await pool.execute(
+      `
+        SELECT score
+        FROM leaderboard_entries
+        WHERE guild_id = ? AND user_id = ?;
+      `,
+      [guildId, userId],
+    );
+
+    previousScore = Number(existing?.score ?? 0);
+
+    if (Number.isNaN(previousScore) || previousScore < 0) {
+      previousScore = 0;
+    }
+  } catch (error) {
+    logDatabaseError(error);
+    return null;
+  }
+
+  const computedIncrement = Number.isFinite(increment) && increment > 0
+    ? Math.trunc(increment)
+    : messageXpForScore(previousScore);
+
+  const normalizedIncrement = Math.max(1, computedIncrement);
 
   try {
     await pool.execute(
@@ -95,13 +122,11 @@ export async function incrementLeaderboardScore(guildId, userId, increment = 1) 
       [guildId, userId],
     );
 
-    const currentScore = Number(row?.score ?? normalizedIncrement);
+    const currentScore = Number(row?.score ?? previousScore + normalizedIncrement);
 
     if (Number.isNaN(currentScore)) {
       return null;
     }
-
-    const previousScore = Math.max(0, currentScore - normalizedIncrement);
 
     return {
       currentScore,

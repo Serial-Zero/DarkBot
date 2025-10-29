@@ -3,10 +3,6 @@ import { config as loadEnv } from 'dotenv';
 import { dirname, join, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { Client, Events, GatewayIntentBits } from 'discord.js';
-import { handleNSFWCommand } from './handlers/nsfwHandler.js';
-import { refreshCommands } from './handlers/commandRefreshHandler.js';
-import { commandMap } from './commands/index.js';
-import { registerEvents } from './events/index.js';
 
 const moduleDir = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(moduleDir, '..');
@@ -43,9 +39,31 @@ if (!token) {
   );
 }
 
+process.on('unhandledRejection', (reason) => {
+  console.error('[Process] Unhandled promise rejection.', reason);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('[Process] Uncaught exception.', error);
+  process.exitCode = 1;
+});
+
+const [
+  { handleNSFWCommand },
+  { refreshCommands },
+  { commandMap },
+  { registerEvents },
+] = await Promise.all([
+  import('./handlers/nsfwHandler.js'),
+  import('./handlers/commandRefreshHandler.js'),
+  import('./commands/index.js'),
+  import('./events/index.js'),
+]);
+
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
   ],
@@ -109,4 +127,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 });
 
-client.login(token);
+client
+  .login(token)
+  .catch((error) => {
+    console.error('Failed to log in to Discord. Check your DISCORD_BOT_TOKEN and network connectivity.', error);
+    process.exitCode = 1;
+  });

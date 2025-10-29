@@ -1,5 +1,7 @@
 export const BASE_LEVEL_XP = 100;
 export const LEVEL_XP_GROWTH = 25;
+export const BASE_MESSAGE_XP = 1;
+export const MESSAGE_XP_GROWTH = 0.15;
 
 /**
  * Returns the XP required to advance from the provided level to the next.
@@ -55,4 +57,30 @@ export function getLevelProgress(score) {
  */
 export function calculateLevel(score) {
   return getLevelProgress(score).level;
+}
+
+/**
+ * Determines how much XP a single message should award at the provided level.
+ * @param {number} level
+ * @returns {number}
+ */
+export function messageXpForLevel(level) {
+  if (!Number.isFinite(level) || level < 1) {
+    return BASE_MESSAGE_XP;
+  }
+
+  const normalizedLevel = Math.max(1, Math.trunc(level));
+  const scaled = BASE_MESSAGE_XP * (1 + MESSAGE_XP_GROWTH * (normalizedLevel - 1));
+
+  return Math.max(1, Math.ceil(scaled));
+}
+
+/**
+ * Determines how much XP a single message should award for a given XP total.
+ * @param {number} score
+ * @returns {number}
+ */
+export function messageXpForScore(score) {
+  const safeScore = Number.isFinite(score) ? Math.max(0, Math.floor(score)) : 0;
+  return messageXpForLevel(calculateLevel(safeScore));
 }

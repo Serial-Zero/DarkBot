@@ -1,6 +1,7 @@
 /** @typedef {import('../types.js').CommandModule} CommandModule */
 
-import { banCommand } from './ban.js';
+import { xpCommand } from './xp.js';
 
 /** @type {CommandModule[]} */
-export const adminCommands = [banCommand];
+export const levelingCommands = [xpCommand];
+

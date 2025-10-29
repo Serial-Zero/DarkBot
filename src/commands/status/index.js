@@ -1,6 +1,7 @@
 /** @typedef {import('../types.js').CommandModule} CommandModule */
 
-import { rule34Command } from './rule34.js';
+import { afkCommand } from './afk.js';
 
 /** @type {CommandModule[]} */
-export const nsfwCommands = [rule34Command];
+export const statusCommands = [afkCommand];
+
