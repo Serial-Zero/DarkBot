@@ -1,5 +1,5 @@
 import { REST, Routes } from 'discord.js';
-import { commandModules } from '../commands/index.js';
+import { commandModules } from '../../commands/index.js';
 
 /** @type {import('discord.js').RESTPostAPIChatInputApplicationCommandsJSONBody[]} */
 const commands = commandModules.map((command) => command.data.toJSON());
@@ -34,3 +34,4 @@ export async function refreshCommands() {
 }
 
 export { commands };
+

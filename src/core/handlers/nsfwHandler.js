@@ -51,3 +51,4 @@ export async function handleNSFWCommand(interaction, execute) {
 
   await execute(interaction);
 }
+
