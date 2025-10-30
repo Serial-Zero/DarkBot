@@ -1,8 +1,9 @@
 import { afkEvents } from '../features/afk/events.js';
+import { inviteEvents } from '../features/invites/events.js';
 import { leaderboardEvents } from '../features/leaderboard/events.js';
 import { memberRoleEvents } from '../features/memberRole/events.js';
 
-const eventGroups = [afkEvents, leaderboardEvents, memberRoleEvents];
+const eventGroups = [afkEvents, inviteEvents, leaderboardEvents, memberRoleEvents];
 
 export const eventModules = eventGroups.flat();
 

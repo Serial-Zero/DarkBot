@@ -2,6 +2,7 @@
 
 import { adminCommands } from './admin/index.js';
 import { imageCommands } from './images/index.js';
+import { inviteCommands } from './invites/index.js';
 import { leaderboardCommands } from './leaderboard/index.js';
 import { levelingCommands } from './leveling/index.js';
 import { statusCommands } from './status/index.js';
@@ -10,6 +11,7 @@ import { statusCommands } from './status/index.js';
 export const commandModules = [
   ...imageCommands,
   ...adminCommands,
+  ...inviteCommands,
   ...leaderboardCommands,
   ...levelingCommands,
   ...statusCommands,
