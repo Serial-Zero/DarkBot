@@ -376,8 +376,10 @@ async function execute(interaction) {
 
     if (isVideo && fileUrl) {
       await interaction.editReply({
-        content: fileUrl,
         embeds: [embed],
+      });
+      await interaction.followUp({
+        content: fileUrl,
       });
     } else {
       await interaction.editReply({
