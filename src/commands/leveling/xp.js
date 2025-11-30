@@ -44,24 +44,26 @@ function buildXpEmbed(targetUser, standing) {
   const percent = Math.round(progress.progress * 100);
   const xpRemaining = Math.max(progress.xpForNextLevel - progress.pointsIntoLevel, 0);
 
-  const embed = new EmbedBuilder()
-    .setColor(0x5865f2)
-    .setTitle(`${targetUser.username}'s XP`)
-    .setThumbnail(targetUser.displayAvatarURL({ size: 128 }))
-    .addFields(
-      { name: 'Level', value: formatNumber(progress.level), inline: true },
-      { name: 'Total XP', value: formatNumber(progress.totalXp), inline: true },
-      { name: 'Rank', value: standing ? `#${formatNumber(standing.rank)}` : 'Unranked', inline: true },
-      { name: 'Progress', value: `${formatNumber(progress.pointsIntoLevel)}/${formatNumber(progress.xpForNextLevel)} XP (${percent}%)` },
-      { name: 'XP To Level Up', value: xpRemaining === 0 ? 'Level up achieved!' : `${formatNumber(xpRemaining)} XP remaining` },
-    )
-    .setFooter({ text: `XP required grows by ${LEVEL_XP_GROWTH} each level (base ${BASE_LEVEL_XP}).` });
+  const desc = [];
 
   if (!standing) {
-    embed.setDescription(`${targetUser} has not earned any XP on this server yet. Start chatting to gain levels!`);
+    desc.push(`${targetUser} has not earned any XP on this server yet. Start chatting to gain levels!`);
+    desc.push('');
   }
 
-  return embed;
+  desc.push(
+    `**Level:** ${formatNumber(progress.level)}`,
+    `**Total XP:** ${formatNumber(progress.totalXp)}`,
+    `**Rank:** ${standing ? `#${formatNumber(standing.rank)}` : 'Unranked'}`,
+    `**Progress:** ${formatNumber(progress.pointsIntoLevel)}/${formatNumber(progress.xpForNextLevel)} XP (${percent}%)`,
+    `**XP To Level Up:** ${xpRemaining === 0 ? 'Level up achieved!' : `${formatNumber(xpRemaining)} XP remaining`}`,
+  );
+
+  return new EmbedBuilder()
+    .setColor(0x2b2d31)
+    .setTitle(`${targetUser.username}'s XP`)
+    .setDescription(desc.join('\n'))
+    .setThumbnail(targetUser.displayAvatarURL({ size: 128 }));
 }
 
 export const xpCommand = {

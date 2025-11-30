@@ -83,15 +83,18 @@ function buildLeaderboardEmbed(entries, page, totalPages, userStanding, totalMem
     userLine = `Your rank: #${rank} • Level ${level} (${pointsIntoLevel}/${xpForNextLevel} XP this level) • ${score} XP total`;
   }
 
-  const description = [userLine, '', ...lines].join('\n');
+  const desc = [
+    userLine,
+    '',
+    ...lines,
+    '',
+    `Page ${page}/${totalPages} • Tracking ${totalMembers} member${totalMembers === 1 ? '' : 's'}`,
+  ];
 
   return new EmbedBuilder()
-    .setColor(0x5865f2)
+    .setColor(0x2b2d31)
     .setTitle('Server Leaderboard')
-    .setDescription(description)
-    .setFooter({
-      text: `Page ${page}/${totalPages} • Tracking ${totalMembers} member${totalMembers === 1 ? '' : 's'} • Level cost: ${BASE_LEVEL_XP} XP + ${LEVEL_XP_GROWTH} per level`,
-    });
+    .setDescription(desc.join('\n'));
 }
 
 export const leaderboardCommand = {

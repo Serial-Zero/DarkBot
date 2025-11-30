@@ -270,32 +270,23 @@ function createPostEmbed(post, tags) {
   const ratingLabel = post.rating ? post.rating.toUpperCase() : 'UNKNOWN';
   const postUrl = `https://rule34.xxx/index.php?page=post&s=view&id=${post.id}`;
 
+  const desc = [
+    `**Tags:** ${tags.map((t) => `\`${t}\``).join(' ')}`,
+    `**Rating:** ${ratingLabel}${typeof post.score === 'number' ? ` • **Score:** ${post.score}` : ''}`,
+  ];
+
+  if (post.source) {
+    desc.push(`**Source:** ${post.source}`);
+  }
+
   const embed = new EmbedBuilder()
+    .setColor(0x2b2d31)
     .setTitle('Rule34 Result')
     .setURL(postUrl)
-    .setDescription(`Tags: ${tags.map((tag) => `\`${tag}\``).join(' ')}`)
-    .setFooter({
-      text: `Rating: ${ratingLabel}${typeof post.score === 'number' ? ` • Score: ${post.score}` : ''}`,
-    });
+    .setDescription(desc.join('\n'));
 
   if (imageUrl) {
     embed.setImage(imageUrl);
-  }
-
-  if (post.source) {
-    embed.addFields({ name: 'Source', value: post.source, inline: false });
-  }
-
-  if (post.tags) {
-    const condensedTags = post.tags
-      .split(' ')
-      .filter(Boolean)
-      .slice(0, 25)
-      .join(', ');
-
-    if (condensedTags.length > 0) {
-      embed.addFields({ name: 'Post Tags', value: condensedTags, inline: false });
-    }
   }
 
   return embed;

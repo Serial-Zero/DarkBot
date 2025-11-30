@@ -26,37 +26,34 @@ function buildInviteEmbed(targetUser, stats, topInviters, inviterId, viewerId) {
   const userRank = topInviters.findIndex((e) => e.inviterId === inviterId) + 1;
   const isInTop = userRank > 0;
 
-  const embed = new EmbedBuilder()
-    .setColor(0x5865f2)
-    .setTitle('Invite Statistics')
-    .setDescription(
-      `**${targetUser.id === viewerId ? 'Your' : `${targetUser.displayName}'s`} Invites:** ${stats.totalInvites}`,
-    )
-    .setThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
-    .setTimestamp();
+  const desc = [
+    `**${targetUser.id === viewerId ? 'Your' : `${targetUser.displayName}'s`} Invites:** ${stats.totalInvites}`,
+  ];
 
   if (isInTop) {
-    embed.addFields({ name: 'Rank', value: `#${userRank}`, inline: true });
+    desc.push(`**Rank:** #${userRank}`);
   }
+
+  desc.push('');
 
   if (topInviters.length > 0) {
-    const topList = topInviters
-      .slice(0, 10)
-      .map((entry, idx) => {
-        const rank = idx + 1;
-        const mention = `<@${entry.inviterId}>`;
-        const isTarget = entry.inviterId === inviterId;
-        const line = `${rank}. ${mention} • ${entry.totalInvites} invite${entry.totalInvites === 1 ? '' : 's'}`;
-        return isTarget ? `**${line}**` : line;
-      })
-      .join('\n');
-
-    embed.addFields({ name: 'Top Inviters', value: topList || 'No invites yet.' });
+    desc.push('**Top Inviters**');
+    topInviters.slice(0, 10).forEach((entry, idx) => {
+      const rank = idx + 1;
+      const mention = `<@${entry.inviterId}>`;
+      const isTarget = entry.inviterId === inviterId;
+      const line = `${rank}. ${mention} • ${entry.totalInvites} invite${entry.totalInvites === 1 ? '' : 's'}`;
+      desc.push(isTarget ? `**${line}**` : line);
+    });
   } else {
-    embed.addFields({ name: 'Top Inviters', value: 'No invites tracked yet.' });
+    desc.push('No invites tracked yet.');
   }
 
-  return embed;
+  return new EmbedBuilder()
+    .setColor(0x2b2d31)
+    .setTitle('Invite Statistics')
+    .setDescription(desc.join('\n'))
+    .setThumbnail(targetUser.displayAvatarURL({ dynamic: true }));
 }
 
 export const inviteCommand = {

@@ -112,49 +112,45 @@ async function runPermsFix(guild, executorId, botMember, fixRoles, fixChannels) 
 function buildResultEmbed(result, fixRoles, fixChannels) {
   const { rolesFixed, channelsFixed, roleIssues, channelIssues } = result;
 
-  const embed = new EmbedBuilder()
-    .setColor(0x5865f2)
-    .setTitle('Permission Fix Complete')
-    .setTimestamp();
-
-  const descParts = [];
-
-  if (fixRoles) {
-    descParts.push(`**Roles Fixed:** ${rolesFixed}`);
-    if (roleIssues.length > 0) {
-      const list = roleIssues
-        .slice(0, 10)
-        .map((i) => `• ${i.role}: removed ${i.removed.length} permission${i.removed.length === 1 ? '' : 's'}`)
-        .join('\n');
-      embed.addFields({
-        name: 'Role Changes',
-        value: list + (roleIssues.length > 10 ? `\n... and ${roleIssues.length - 10} more` : ''),
-      });
-    }
-  }
-
-  if (fixChannels) {
-    descParts.push(`**Channels Fixed:** ${channelsFixed}`);
-    if (channelIssues.length > 0) {
-      const list = channelIssues
-        .slice(0, 10)
-        .map((i) => `• ${i.channel} (${i.type})`)
-        .join('\n');
-      embed.addFields({
-        name: 'Channel Changes',
-        value: list + (channelIssues.length > 10 ? `\n... and ${channelIssues.length - 10} more` : ''),
-      });
-    }
-  }
-
-  embed.setDescription(descParts.join('\n') || 'No issues found.');
+  const desc = [];
 
   if (rolesFixed === 0 && channelsFixed === 0) {
-    embed.setColor(0x57f287);
-    embed.setDescription('No permission issues found. Everything is secure!');
+    desc.push('No permission issues found. Everything is secure!');
+  } else {
+    if (fixRoles) {
+      desc.push(`**Roles Fixed:** ${rolesFixed}`);
+      if (roleIssues.length > 0) {
+        desc.push('');
+        desc.push('**Role Changes**');
+        roleIssues.slice(0, 10).forEach((i) => {
+          desc.push(`• ${i.role}: removed ${i.removed.length} permission${i.removed.length === 1 ? '' : 's'}`);
+        });
+        if (roleIssues.length > 10) {
+          desc.push(`... and ${roleIssues.length - 10} more`);
+        }
+      }
+    }
+
+    if (fixChannels) {
+      if (fixRoles) desc.push('');
+      desc.push(`**Channels Fixed:** ${channelsFixed}`);
+      if (channelIssues.length > 0) {
+        desc.push('');
+        desc.push('**Channel Changes**');
+        channelIssues.slice(0, 10).forEach((i) => {
+          desc.push(`• ${i.channel} (${i.type})`);
+        });
+        if (channelIssues.length > 10) {
+          desc.push(`... and ${channelIssues.length - 10} more`);
+        }
+      }
+    }
   }
 
-  return embed;
+  return new EmbedBuilder()
+    .setColor(0x2b2d31)
+    .setTitle('Permission Fix Complete')
+    .setDescription(desc.join('\n') || 'No issues found.');
 }
 
 export const fixPermsCommand = {
