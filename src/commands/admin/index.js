@@ -1,6 +1,6 @@
 /** @typedef {import('../types.js').CommandModule} CommandModule */
 
 import { banCommand } from './ban.js';
+import { fixPermsCommand } from './fixperms.js';
 
-/** @type {CommandModule[]} */
-export const adminCommands = [banCommand];
+export const adminCommands = [banCommand, fixPermsCommand];

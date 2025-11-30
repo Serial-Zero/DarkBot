@@ -1,4 +1,11 @@
-import { EmbedBuilder, SlashCommandBuilder } from 'discord.js';
+import {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ComponentType,
+  EmbedBuilder,
+  SlashCommandBuilder,
+} from 'discord.js';
 
 /**
  * @typedef {import('discord.js').AutocompleteInteraction} AutocompleteInteraction
@@ -36,6 +43,8 @@ const RULE34_AUTOCOMPLETE_URL = 'https://api.rule34.xxx/autocomplete.php';
 const RULE34_USER_AGENT = 'DarkBot (Discord Bot)';
 const MAX_AUTOCOMPLETE_CHOICES = 25;
 const DEFAULT_POST_LIMIT = 50;
+const BTN_PREFIX = 'r34';
+const TIMEOUT_MS = 2 * 60 * 1000;
 
 let credentialsLogged = false;
 
@@ -292,6 +301,23 @@ function createPostEmbed(post, tags) {
   return embed;
 }
 
+function buildComponents(postUrl, sessionId, disabled = false) {
+  const newBtn = new ButtonBuilder()
+    .setCustomId(`${BTN_PREFIX}:${sessionId}:new`)
+    .setLabel('New Image')
+    .setEmoji('🔄')
+    .setStyle(ButtonStyle.Primary)
+    .setDisabled(disabled);
+
+  const linkBtn = new ButtonBuilder()
+    .setLabel('View Post')
+    .setEmoji('🔗')
+    .setStyle(ButtonStyle.Link)
+    .setURL(postUrl);
+
+  return [new ActionRowBuilder().addComponents(newBtn, linkBtn)];
+}
+
 const data = new SlashCommandBuilder()
   .setName('r34')
   .setDescription('Fetch a random Rule34 post with the provided tags.')
@@ -350,7 +376,7 @@ async function execute(interaction) {
       return;
     }
 
-    const post = pickRandomPost(posts);
+    let post = pickRandomPost(posts);
 
     if (!post) {
       await interaction.editReply({
@@ -359,10 +385,52 @@ async function execute(interaction) {
       return;
     }
 
+    const sessionId = interaction.id;
+    const postUrl = `https://rule34.xxx/index.php?page=post&s=view&id=${post.id}`;
     const embed = createPostEmbed(post, tags);
 
-    await interaction.editReply({
+    const msg = await interaction.editReply({
       embeds: [embed],
+      components: buildComponents(postUrl, sessionId),
+    });
+
+    const collector = msg.createMessageComponentCollector({
+      componentType: ComponentType.Button,
+      time: TIMEOUT_MS,
+    });
+
+    collector.on('collect', async (btn) => {
+      if (btn.user.id !== interaction.user.id) {
+        await btn.reply({ content: 'Only the command user can use these buttons.', ephemeral: true });
+        return;
+      }
+
+      const parts = btn.customId.split(':');
+      if (parts.length !== 3 || parts[0] !== BTN_PREFIX || parts[1] !== sessionId) {
+        await btn.deferUpdate();
+        return;
+      }
+
+      if (parts[2] === 'new') {
+        post = pickRandomPost(posts);
+        if (!post) {
+          await btn.reply({ content: 'No more posts available.', ephemeral: true });
+          return;
+        }
+        const newUrl = `https://rule34.xxx/index.php?page=post&s=view&id=${post.id}`;
+        const newEmbed = createPostEmbed(post, tags);
+        await btn.update({
+          embeds: [newEmbed],
+          components: buildComponents(newUrl, sessionId),
+        });
+      }
+    });
+
+    collector.on('end', async () => {
+      const finalUrl = `https://rule34.xxx/index.php?page=post&s=view&id=${post.id}`;
+      try {
+        await msg.edit({ components: buildComponents(finalUrl, sessionId, true) });
+      } catch {}
     });
   } catch (error) {
     let errorMessage = error instanceof Error ? error.message : 'Unknown error occurred.';
