@@ -252,6 +252,17 @@ function pickRandomPost(posts) {
 }
 
 /**
+ * @param {string} url
+ * @returns {boolean}
+ */
+function isVideoUrl(url) {
+  if (!url) return false;
+  const vidExts = ['.mp4', '.webm', '.gifv', '.mov', '.avi', '.mkv', '.flv', '.wmv'];
+  const lowerUrl = url.toLowerCase();
+  return vidExts.some(ext => lowerUrl.includes(ext));
+}
+
+/**
  * @param {Rule34Post} post
  * @param {string[]} tags
  * @returns {EmbedBuilder}
@@ -269,7 +280,7 @@ function createPostEmbed(post, tags) {
       text: `Rating: ${ratingLabel}${typeof post.score === 'number' ? ` • Score: ${post.score}` : ''}`,
     });
 
-  if (imageUrl) {
+  if (imageUrl && !isVideoUrl(imageUrl)) {
     embed.setImage(imageUrl);
   }
 
@@ -359,11 +370,22 @@ async function execute(interaction) {
       return;
     }
 
+    const fileUrl = post.file_url ?? post.sample_url ?? post.preview_url ?? null;
+    const isVideo = fileUrl && isVideoUrl(fileUrl);
     const embed = createPostEmbed(post, tags);
 
-    await interaction.editReply({
-      embeds: [embed],
-    });
+    if (isVideo && fileUrl) {
+      await interaction.editReply({
+        embeds: [embed],
+      });
+      await interaction.followUp({
+        content: fileUrl,
+      });
+    } else {
+      await interaction.editReply({
+        embeds: [embed],
+      });
+    }
   } catch (error) {
     let errorMessage = error instanceof Error ? error.message : 'Unknown error occurred.';
 
