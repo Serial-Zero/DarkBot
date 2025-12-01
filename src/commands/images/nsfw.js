@@ -1,4 +1,15 @@
-import { EmbedBuilder, SlashCommandBuilder } from 'discord.js';
+import {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ComponentType,
+  ContainerBuilder,
+  MessageFlags,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
+  SlashCommandBuilder,
+  TextDisplayBuilder,
+} from 'discord.js';
 
 /**
  * @typedef {import('discord.js').AutocompleteInteraction} AutocompleteInteraction
@@ -36,6 +47,8 @@ const RULE34_AUTOCOMPLETE_URL = 'https://api.rule34.xxx/autocomplete.php';
 const RULE34_USER_AGENT = 'DarkBot (Discord Bot)';
 const MAX_AUTOCOMPLETE_CHOICES = 25;
 const DEFAULT_POST_LIMIT = 50;
+const BTN_PREFIX = 'r34';
+const TIMEOUT_MS = 2 * 60 * 1000;
 
 let credentialsLogged = false;
 
@@ -251,56 +264,48 @@ function pickRandomPost(posts) {
   return posts[index] ?? null;
 }
 
-/**
- * @param {string} url
- * @returns {boolean}
- */
-function isVideoUrl(url) {
-  if (!url) return false;
-  const vidExts = ['.mp4', '.webm', '.gifv', '.mov', '.avi', '.mkv', '.flv', '.wmv'];
-  const lowerUrl = url.toLowerCase();
-  return vidExts.some(ext => lowerUrl.includes(ext));
-}
-
-/**
- * @param {Rule34Post} post
- * @param {string[]} tags
- * @returns {EmbedBuilder}
- */
-function createPostEmbed(post, tags) {
+function createPostComponents(post, tags) {
   const imageUrl = post.file_url ?? post.sample_url ?? post.preview_url ?? null;
   const ratingLabel = post.rating ? post.rating.toUpperCase() : 'UNKNOWN';
-  const postUrl = `https://rule34.xxx/index.php?page=post&s=view&id=${post.id}`;
 
-  const embed = new EmbedBuilder()
-    .setTitle('Rule34 Result')
-    .setURL(postUrl)
-    .setDescription(`Tags: ${tags.map((tag) => `\`${tag}\``).join(' ')}`)
-    .setFooter({
-      text: `Rating: ${ratingLabel}${typeof post.score === 'number' ? ` • Score: ${post.score}` : ''}`,
-    });
-
-  if (imageUrl && !isVideoUrl(imageUrl)) {
-    embed.setImage(imageUrl);
-  }
+  const lines = [
+    '## Rule34 Result',
+    '',
+    `**Tags:** ${tags.map((t) => `\`${t}\``).join(' ')}`,
+    `**Rating:** ${ratingLabel}${typeof post.score === 'number' ? ` • **Score:** ${post.score}` : ''}`,
+  ];
 
   if (post.source) {
-    embed.addFields({ name: 'Source', value: post.source, inline: false });
+    lines.push(`**Source:** ${post.source}`);
   }
 
-  if (post.tags) {
-    const condensedTags = post.tags
-      .split(' ')
-      .filter(Boolean)
-      .slice(0, 25)
-      .join(', ');
+  const components = [
+    new TextDisplayBuilder().setContent(lines.join('\n')),
+  ];
 
-    if (condensedTags.length > 0) {
-      embed.addFields({ name: 'Post Tags', value: condensedTags, inline: false });
-    }
+  if (imageUrl) {
+    components.push(
+      new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small),
+      new TextDisplayBuilder().setContent(imageUrl),
+    );
   }
 
-  return embed;
+  return new ContainerBuilder().addComponents(...components);
+}
+
+function buildButtonRow(postUrl, sessionId, disabled = false) {
+  const newBtn = new ButtonBuilder()
+    .setCustomId(`${BTN_PREFIX}:${sessionId}:new`)
+    .setLabel('New Image')
+    .setStyle(ButtonStyle.Primary)
+    .setDisabled(disabled);
+
+  const linkBtn = new ButtonBuilder()
+    .setLabel('View Post')
+    .setStyle(ButtonStyle.Link)
+    .setURL(postUrl);
+
+  return new ActionRowBuilder().addComponents(newBtn, linkBtn);
 }
 
 const data = new SlashCommandBuilder()
@@ -361,7 +366,7 @@ async function execute(interaction) {
       return;
     }
 
-    const post = pickRandomPost(posts);
+    let post = pickRandomPost(posts);
 
     if (!post) {
       await interaction.editReply({
@@ -370,22 +375,53 @@ async function execute(interaction) {
       return;
     }
 
-    const fileUrl = post.file_url ?? post.sample_url ?? post.preview_url ?? null;
-    const isVideo = fileUrl && isVideoUrl(fileUrl);
-    const embed = createPostEmbed(post, tags);
+    const sessionId = interaction.id;
+    const postUrl = `https://rule34.xxx/index.php?page=post&s=view&id=${post.id}`;
+    const container = createPostComponents(post, tags);
 
-    if (isVideo && fileUrl) {
-      await interaction.editReply({
-        embeds: [embed],
-      });
-      await interaction.followUp({
-        content: fileUrl,
-      });
-    } else {
-      await interaction.editReply({
-        embeds: [embed],
-      });
-    }
+    const msg = await interaction.editReply({
+      flags: MessageFlags.IsComponentsV2,
+      components: [container, buildButtonRow(postUrl, sessionId)],
+    });
+
+    const collector = msg.createMessageComponentCollector({
+      componentType: ComponentType.Button,
+      time: TIMEOUT_MS,
+    });
+
+    collector.on('collect', async (btn) => {
+      if (btn.user.id !== interaction.user.id) {
+        await btn.reply({ content: 'Only the command user can use these buttons.', ephemeral: true });
+        return;
+      }
+
+      const parts = btn.customId.split(':');
+      if (parts.length !== 3 || parts[0] !== BTN_PREFIX || parts[1] !== sessionId) {
+        await btn.deferUpdate();
+        return;
+      }
+
+      if (parts[2] === 'new') {
+        post = pickRandomPost(posts);
+        if (!post) {
+          await btn.reply({ content: 'No more posts available.', ephemeral: true });
+          return;
+        }
+        const newUrl = `https://rule34.xxx/index.php?page=post&s=view&id=${post.id}`;
+        const newContainer = createPostComponents(post, tags);
+        await btn.update({
+          components: [newContainer, buildButtonRow(newUrl, sessionId)],
+        });
+      }
+    });
+
+    collector.on('end', async () => {
+      const finalUrl = `https://rule34.xxx/index.php?page=post&s=view&id=${post.id}`;
+      const finalContainer = createPostComponents(post, tags);
+      try {
+        await msg.edit({ components: [finalContainer, buildButtonRow(finalUrl, sessionId, true)] });
+      } catch {}
+    });
   } catch (error) {
     let errorMessage = error instanceof Error ? error.message : 'Unknown error occurred.';
 
