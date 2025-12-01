@@ -4,6 +4,8 @@ import {
   ButtonStyle,
   ComponentType,
   ContainerBuilder,
+  MediaGalleryBuilder,
+  MediaGalleryItemBuilder,
   MessageFlags,
   SlashCommandBuilder,
   TextDisplayBuilder,
@@ -277,13 +279,19 @@ function createPostComponents(post, tags) {
     lines.push(`**Source:** ${post.source}`);
   }
 
-  if (imageUrl) {
-    lines.push('', imageUrl);
-  }
-
-  return new ContainerBuilder().addTextDisplayComponents(
+  const container = new ContainerBuilder().addTextDisplayComponents(
     new TextDisplayBuilder().setContent(lines.join('\n')),
   );
+
+  if (imageUrl) {
+    container.addMediaGalleryComponents(
+      new MediaGalleryBuilder().addItems(
+        new MediaGalleryItemBuilder().setURL(imageUrl),
+      ),
+    );
+  }
+
+  return container;
 }
 
 function buildButtonRow(postUrl, sessionId, disabled = false) {
