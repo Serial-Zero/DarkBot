@@ -3,8 +3,10 @@ import {
   ButtonBuilder,
   ButtonStyle,
   ComponentType,
-  EmbedBuilder,
+  ContainerBuilder,
+  MessageFlags,
   SlashCommandBuilder,
+  TextDisplayBuilder,
 } from 'discord.js';
 import {
   countLeaderboardEntries,
@@ -31,24 +33,20 @@ const INTERACTION_TIMEOUT_MS = 2 * 60 * 1000;
  * @param {boolean} [disableAll=false]
  * @returns {import('discord.js').ActionRowBuilder<import('discord.js').ButtonBuilder>[]}
  */
-function buildNavigationComponents(page, totalPages, sessionId, disableAll = false) {
-  if (totalPages <= 1) {
-    return [];
-  }
-
-  const backButton = new ButtonBuilder()
+function buildNavRow(page, totalPages, sessionId, disableAll = false) {
+  const backBtn = new ButtonBuilder()
     .setCustomId(`${BUTTON_PREFIX}:${sessionId}:prev`)
-    .setEmoji('◀️')
+    .setLabel('◀')
     .setStyle(ButtonStyle.Secondary)
     .setDisabled(disableAll || page <= 1);
 
-  const forwardButton = new ButtonBuilder()
+  const forwardBtn = new ButtonBuilder()
     .setCustomId(`${BUTTON_PREFIX}:${sessionId}:next`)
-    .setEmoji('▶️')
+    .setLabel('▶')
     .setStyle(ButtonStyle.Secondary)
     .setDisabled(disableAll || page >= totalPages);
 
-  return [new ActionRowBuilder().addComponents(backButton, forwardButton)];
+  return new ActionRowBuilder().addComponents(backBtn, forwardBtn);
 }
 
 /**
@@ -62,10 +60,10 @@ function buildNavigationComponents(page, totalPages, sessionId, disableAll = fal
  * @param {number} pageSize
  * @returns {import('discord.js').EmbedBuilder}
  */
-function buildLeaderboardEmbed(entries, page, totalPages, userStanding, totalMembers, viewerId, pageSize) {
+function buildLeaderboardComponents(entries, page, totalPages, userStanding, totalMembers, viewerId, pageSize) {
   const startRank = (page - 1) * pageSize;
 
-  const lines = entries.map((entry, index) => {
+  const entryLines = entries.map((entry, index) => {
     const rank = startRank + index + 1;
     const mention = `<@${entry.user_id}>`;
     const level = calculateLevel(entry.score);
@@ -74,8 +72,7 @@ function buildLeaderboardEmbed(entries, page, totalPages, userStanding, totalMem
     return highlighted ? `**${line}**` : line;
   });
 
-  let userLine =
-    'You have not placed on the leaderboard yet. Keep chatting to earn points!';
+  let userLine = 'You have not placed on the leaderboard yet. Keep chatting to earn points!';
 
   if (userStanding) {
     const { score, rank } = userStanding;
@@ -83,18 +80,19 @@ function buildLeaderboardEmbed(entries, page, totalPages, userStanding, totalMem
     userLine = `Your rank: #${rank} • Level ${level} (${pointsIntoLevel}/${xpForNextLevel} XP this level) • ${score} XP total`;
   }
 
-  const desc = [
+  const lines = [
+    '## Server Leaderboard',
+    '',
     userLine,
     '',
-    ...lines,
+    ...entryLines,
     '',
     `Page ${page}/${totalPages} • Tracking ${totalMembers} member${totalMembers === 1 ? '' : 's'}`,
   ];
 
-  return new EmbedBuilder()
-    .setColor(0x2b2d31)
-    .setTitle('Server Leaderboard')
-    .setDescription(desc.join('\n'));
+  return new ContainerBuilder().addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(lines.join('\n')),
+  );
 }
 
 export const leaderboardCommand = {
@@ -169,23 +167,8 @@ export const leaderboardCommand = {
 
     const sessionId = interaction.id;
 
-    const embed = buildLeaderboardEmbed(
-      entries,
-      currentPage,
-      totalPages,
-      userStanding,
-      totalMembers,
-      interaction.user.id,
-      pageSize,
-    );
-
-    const message = await interaction.editReply({
-      embeds: [embed],
-      components: buildNavigationComponents(currentPage, totalPages, sessionId),
-    });
-
-    const refreshMessage = async () => {
-      const nextEmbed = buildLeaderboardEmbed(
+    const buildMsg = () => {
+      const container = buildLeaderboardComponents(
         entries,
         currentPage,
         totalPages,
@@ -194,50 +177,43 @@ export const leaderboardCommand = {
         interaction.user.id,
         pageSize,
       );
-
-      return {
-        embeds: [nextEmbed],
-        components: buildNavigationComponents(currentPage, totalPages, sessionId),
-      };
+      return totalPages > 1
+        ? [container, buildNavRow(currentPage, totalPages, sessionId)]
+        : [container];
     };
+
+    const message = await interaction.editReply({
+      flags: MessageFlags.IsComponentsV2,
+      components: buildMsg(),
+    });
+
+    if (totalPages <= 1) return;
 
     const collector = message.createMessageComponentCollector({
       componentType: ComponentType.Button,
       time: INTERACTION_TIMEOUT_MS,
     });
 
-    collector.on('collect', async (buttonInteraction) => {
-      if (buttonInteraction.user.id !== interaction.user.id) {
-        await buttonInteraction.reply({
-          content: 'Only the user who ran this command can change pages.',
-          ephemeral: true,
-        });
+    collector.on('collect', async (btn) => {
+      if (btn.user.id !== interaction.user.id) {
+        await btn.reply({ content: 'Only the user who ran this command can change pages.', ephemeral: true });
         return;
       }
 
-      const parts = buttonInteraction.customId.split(':');
-
-      if (parts.length !== 3 || parts[0] !== BUTTON_PREFIX) {
-        await buttonInteraction.deferUpdate();
+      const parts = btn.customId.split(':');
+      if (parts.length !== 3 || parts[0] !== BUTTON_PREFIX || parts[1] !== sessionId) {
+        await btn.deferUpdate();
         return;
       }
 
-      const [, session, action] = parts;
-
-      if (session !== sessionId) {
-        await buttonInteraction.reply({
-          content: 'This pagination session is no longer active.',
-          ephemeral: true,
-        });
-        return;
-      }
+      const action = parts[2];
 
       if (action === 'prev' && currentPage > 1) {
         currentPage -= 1;
       } else if (action === 'next' && currentPage < totalPages) {
         currentPage += 1;
       } else {
-        await buttonInteraction.deferUpdate();
+        await btn.deferUpdate();
         return;
       }
 
@@ -245,26 +221,35 @@ export const leaderboardCommand = {
 
       if (entries === null) {
         collector.stop('db_error');
-        await buttonInteraction.update({
-          content:
-            'The leaderboard is not available right now. Ensure the database credentials are configured correctly.',
-          embeds: [],
-          components: [],
+        await btn.update({
+          flags: MessageFlags.IsComponentsV2,
+          components: [
+            new ContainerBuilder().addTextDisplayComponents(
+              new TextDisplayBuilder().setContent('The leaderboard is not available right now.'),
+            ),
+          ],
         });
         return;
       }
 
-      await buttonInteraction.update(await refreshMessage());
+      await btn.update({ components: buildMsg() });
     });
 
     collector.on('end', async () => {
+      const finalContainer = buildLeaderboardComponents(
+        entries,
+        currentPage,
+        totalPages,
+        userStanding,
+        totalMembers,
+        interaction.user.id,
+        pageSize,
+      );
       try {
         await message.edit({
-          components: buildNavigationComponents(currentPage, totalPages, sessionId, true),
+          components: [finalContainer, buildNavRow(currentPage, totalPages, sessionId, true)],
         });
-      } catch {
-        // Message was deleted or already edited elsewhere.
-      }
+      } catch {}
     });
   },
 };

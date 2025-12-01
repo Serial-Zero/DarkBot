@@ -3,8 +3,10 @@ import {
   ButtonBuilder,
   ButtonStyle,
   ComponentType,
-  EmbedBuilder,
+  ContainerBuilder,
+  MessageFlags,
   SlashCommandBuilder,
+  TextDisplayBuilder,
 } from 'discord.js';
 import { fetchLeaderboardStanding } from '../../features/leaderboard/repository.js';
 import {
@@ -20,38 +22,36 @@ function formatNumber(value) {
   return new Intl.NumberFormat().format(value);
 }
 
-function buildComponents(sessionId, disabled = false) {
+function buildButtonRow(sessionId, disabled = false) {
   const refreshBtn = new ButtonBuilder()
     .setCustomId(`${BTN_PREFIX}:${sessionId}:refresh`)
     .setLabel('Refresh')
-    .setEmoji('🔄')
     .setStyle(ButtonStyle.Primary)
     .setDisabled(disabled);
 
   const lbBtn = new ButtonBuilder()
     .setCustomId(`${BTN_PREFIX}:${sessionId}:leaderboard`)
     .setLabel('Leaderboard')
-    .setEmoji('🏆')
     .setStyle(ButtonStyle.Secondary)
     .setDisabled(disabled);
 
-  return [new ActionRowBuilder().addComponents(refreshBtn, lbBtn)];
+  return new ActionRowBuilder().addComponents(refreshBtn, lbBtn);
 }
 
-function buildXpEmbed(targetUser, standing) {
+function buildXpComponents(targetUser, standing) {
   const totalXp = standing?.score ?? 0;
   const progress = getLevelProgress(totalXp);
   const percent = Math.round(progress.progress * 100);
   const xpRemaining = Math.max(progress.xpForNextLevel - progress.pointsIntoLevel, 0);
 
-  const desc = [];
+  const lines = [`## ${targetUser.username}'s XP`, ''];
 
   if (!standing) {
-    desc.push(`${targetUser} has not earned any XP on this server yet. Start chatting to gain levels!`);
-    desc.push('');
+    lines.push(`${targetUser} has not earned any XP on this server yet. Start chatting to gain levels!`);
+    lines.push('');
   }
 
-  desc.push(
+  lines.push(
     `**Level:** ${formatNumber(progress.level)}`,
     `**Total XP:** ${formatNumber(progress.totalXp)}`,
     `**Rank:** ${standing ? `#${formatNumber(standing.rank)}` : 'Unranked'}`,
@@ -59,11 +59,9 @@ function buildXpEmbed(targetUser, standing) {
     `**XP To Level Up:** ${xpRemaining === 0 ? 'Level up achieved!' : `${formatNumber(xpRemaining)} XP remaining`}`,
   );
 
-  return new EmbedBuilder()
-    .setColor(0x2b2d31)
-    .setTitle(`${targetUser.username}'s XP`)
-    .setDescription(desc.join('\n'))
-    .setThumbnail(targetUser.displayAvatarURL({ size: 128 }));
+  return new ContainerBuilder().addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(lines.join('\n')),
+  );
 }
 
 export const xpCommand = {
@@ -93,11 +91,11 @@ export const xpCommand = {
     await interaction.deferReply({ ephemeral: false });
 
     let standing = await fetchLeaderboardStanding(guildId, targetUser.id);
-    const embed = buildXpEmbed(targetUser, standing);
+    const container = buildXpComponents(targetUser, standing);
 
     const msg = await interaction.editReply({
-      embeds: [embed],
-      components: buildComponents(sessionId),
+      flags: MessageFlags.IsComponentsV2,
+      components: [container, buildButtonRow(sessionId)],
     });
 
     const collector = msg.createMessageComponentCollector({
@@ -119,16 +117,17 @@ export const xpCommand = {
 
       if (parts[2] === 'refresh') {
         standing = await fetchLeaderboardStanding(guildId, targetUser.id);
-        const newEmbed = buildXpEmbed(targetUser, standing);
-        await btn.update({ embeds: [newEmbed], components: buildComponents(sessionId) });
+        const newContainer = buildXpComponents(targetUser, standing);
+        await btn.update({ components: [newContainer, buildButtonRow(sessionId)] });
       } else if (parts[2] === 'leaderboard') {
         await btn.reply({ content: 'Use `/leaderboard` to view the full server leaderboard!', ephemeral: true });
       }
     });
 
     collector.on('end', async () => {
+      const finalContainer = buildXpComponents(targetUser, standing);
       try {
-        await msg.edit({ components: buildComponents(sessionId, true) });
+        await msg.edit({ components: [finalContainer, buildButtonRow(sessionId, true)] });
       } catch {}
     });
   },

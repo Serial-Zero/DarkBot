@@ -3,23 +3,24 @@ import {
   ButtonBuilder,
   ButtonStyle,
   ComponentType,
-  EmbedBuilder,
+  ContainerBuilder,
+  MessageFlags,
   PermissionFlagsBits,
   SlashCommandBuilder,
+  TextDisplayBuilder,
 } from 'discord.js';
 
 const BTN_PREFIX = 'fixperms';
 const TIMEOUT_MS = 2 * 60 * 1000;
 
-function buildComponents(sessionId, disabled = false) {
+function buildButtonRow(sessionId, disabled = false) {
   const runBtn = new ButtonBuilder()
     .setCustomId(`${BTN_PREFIX}:${sessionId}:run`)
     .setLabel('Run Again')
-    .setEmoji('🔄')
     .setStyle(ButtonStyle.Primary)
     .setDisabled(disabled);
 
-  return [new ActionRowBuilder().addComponents(runBtn)];
+  return new ActionRowBuilder().addComponents(runBtn);
 }
 
 const DANGEROUS_PERMISSIONS = [
@@ -109,48 +110,47 @@ async function runPermsFix(guild, executorId, botMember, fixRoles, fixChannels) 
   return { rolesFixed, channelsFixed, roleIssues, channelIssues };
 }
 
-function buildResultEmbed(result, fixRoles, fixChannels) {
+function buildResultComponents(result, fixRoles, fixChannels) {
   const { rolesFixed, channelsFixed, roleIssues, channelIssues } = result;
 
-  const desc = [];
+  const lines = ['## Permission Fix Complete', ''];
 
   if (rolesFixed === 0 && channelsFixed === 0) {
-    desc.push('No permission issues found. Everything is secure!');
+    lines.push('No permission issues found. Everything is secure!');
   } else {
     if (fixRoles) {
-      desc.push(`**Roles Fixed:** ${rolesFixed}`);
+      lines.push(`**Roles Fixed:** ${rolesFixed}`);
       if (roleIssues.length > 0) {
-        desc.push('');
-        desc.push('**Role Changes**');
+        lines.push('');
+        lines.push('**Role Changes**');
         roleIssues.slice(0, 10).forEach((i) => {
-          desc.push(`• ${i.role}: removed ${i.removed.length} permission${i.removed.length === 1 ? '' : 's'}`);
+          lines.push(`• ${i.role}: removed ${i.removed.length} permission${i.removed.length === 1 ? '' : 's'}`);
         });
         if (roleIssues.length > 10) {
-          desc.push(`... and ${roleIssues.length - 10} more`);
+          lines.push(`... and ${roleIssues.length - 10} more`);
         }
       }
     }
 
     if (fixChannels) {
-      if (fixRoles) desc.push('');
-      desc.push(`**Channels Fixed:** ${channelsFixed}`);
+      if (fixRoles) lines.push('');
+      lines.push(`**Channels Fixed:** ${channelsFixed}`);
       if (channelIssues.length > 0) {
-        desc.push('');
-        desc.push('**Channel Changes**');
+        lines.push('');
+        lines.push('**Channel Changes**');
         channelIssues.slice(0, 10).forEach((i) => {
-          desc.push(`• ${i.channel} (${i.type})`);
+          lines.push(`• ${i.channel} (${i.type})`);
         });
         if (channelIssues.length > 10) {
-          desc.push(`... and ${channelIssues.length - 10} more`);
+          lines.push(`... and ${channelIssues.length - 10} more`);
         }
       }
     }
   }
 
-  return new EmbedBuilder()
-    .setColor(0x2b2d31)
-    .setTitle('Permission Fix Complete')
-    .setDescription(desc.join('\n') || 'No issues found.');
+  return new ContainerBuilder().addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(lines.join('\n')),
+  );
 }
 
 export const fixPermsCommand = {
@@ -215,11 +215,11 @@ export const fixPermsCommand = {
     const sessionId = interaction.id;
 
     let result = await runPermsFix(guild, interaction.user.id, botMember, fixRoles, fixChannels);
-    const embed = buildResultEmbed(result, fixRoles, fixChannels);
+    const container = buildResultComponents(result, fixRoles, fixChannels);
 
     const msg = await interaction.editReply({
-      embeds: [embed],
-      components: buildComponents(sessionId),
+      flags: MessageFlags.IsComponentsV2,
+      components: [container, buildButtonRow(sessionId)],
     });
 
     const collector = msg.createMessageComponentCollector({
@@ -242,14 +242,15 @@ export const fixPermsCommand = {
       if (parts[2] === 'run') {
         await btn.deferUpdate();
         result = await runPermsFix(guild, interaction.user.id, botMember, fixRoles, fixChannels);
-        const newEmbed = buildResultEmbed(result, fixRoles, fixChannels);
-        await msg.edit({ embeds: [newEmbed], components: buildComponents(sessionId) });
+        const newContainer = buildResultComponents(result, fixRoles, fixChannels);
+        await msg.edit({ components: [newContainer, buildButtonRow(sessionId)] });
       }
     });
 
     collector.on('end', async () => {
+      const finalContainer = buildResultComponents(result, fixRoles, fixChannels);
       try {
-        await msg.edit({ components: buildComponents(sessionId, true) });
+        await msg.edit({ components: [finalContainer, buildButtonRow(sessionId, true)] });
       } catch {}
     });
   },

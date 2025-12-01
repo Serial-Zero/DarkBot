@@ -3,57 +3,58 @@ import {
   ButtonBuilder,
   ButtonStyle,
   ComponentType,
-  EmbedBuilder,
+  ContainerBuilder,
+  MessageFlags,
   SlashCommandBuilder,
+  TextDisplayBuilder,
 } from 'discord.js';
 import { getInviteStats, getTopInviters } from '../../features/invites/repository.js';
 
 const BTN_PREFIX = 'invites';
 const TIMEOUT_MS = 2 * 60 * 1000;
 
-function buildComponents(sessionId, disabled = false) {
+function buildButtonRow(sessionId, disabled = false) {
   const refreshBtn = new ButtonBuilder()
     .setCustomId(`${BTN_PREFIX}:${sessionId}:refresh`)
     .setLabel('Refresh')
-    .setEmoji('🔄')
     .setStyle(ButtonStyle.Primary)
     .setDisabled(disabled);
 
-  return [new ActionRowBuilder().addComponents(refreshBtn)];
+  return new ActionRowBuilder().addComponents(refreshBtn);
 }
 
-function buildInviteEmbed(targetUser, stats, topInviters, inviterId, viewerId) {
+function buildInviteComponents(targetUser, stats, topInviters, inviterId, viewerId) {
   const userRank = topInviters.findIndex((e) => e.inviterId === inviterId) + 1;
   const isInTop = userRank > 0;
 
-  const desc = [
+  const lines = [
+    '## Invite Statistics',
+    '',
     `**${targetUser.id === viewerId ? 'Your' : `${targetUser.displayName}'s`} Invites:** ${stats.totalInvites}`,
   ];
 
   if (isInTop) {
-    desc.push(`**Rank:** #${userRank}`);
+    lines.push(`**Rank:** #${userRank}`);
   }
 
-  desc.push('');
+  lines.push('');
 
   if (topInviters.length > 0) {
-    desc.push('**Top Inviters**');
+    lines.push('**Top Inviters**');
     topInviters.slice(0, 10).forEach((entry, idx) => {
       const rank = idx + 1;
       const mention = `<@${entry.inviterId}>`;
       const isTarget = entry.inviterId === inviterId;
       const line = `${rank}. ${mention} • ${entry.totalInvites} invite${entry.totalInvites === 1 ? '' : 's'}`;
-      desc.push(isTarget ? `**${line}**` : line);
+      lines.push(isTarget ? `**${line}**` : line);
     });
   } else {
-    desc.push('No invites tracked yet.');
+    lines.push('No invites tracked yet.');
   }
 
-  return new EmbedBuilder()
-    .setColor(0x2b2d31)
-    .setTitle('Invite Statistics')
-    .setDescription(desc.join('\n'))
-    .setThumbnail(targetUser.displayAvatarURL({ dynamic: true }));
+  return new ContainerBuilder().addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(lines.join('\n')),
+  );
 }
 
 export const inviteCommand = {
@@ -98,11 +99,11 @@ export const inviteCommand = {
       return;
     }
 
-    const embed = buildInviteEmbed(targetUser, stats, topInviters, inviterId, interaction.user.id);
+    const container = buildInviteComponents(targetUser, stats, topInviters, inviterId, interaction.user.id);
 
     const msg = await interaction.editReply({
-      embeds: [embed],
-      components: buildComponents(sessionId),
+      flags: MessageFlags.IsComponentsV2,
+      components: [container, buildButtonRow(sessionId)],
     });
 
     const collector = msg.createMessageComponentCollector({
@@ -130,14 +131,15 @@ export const inviteCommand = {
         }
         stats = data.stats;
         topInviters = data.topInviters;
-        const newEmbed = buildInviteEmbed(targetUser, stats, topInviters, inviterId, interaction.user.id);
-        await btn.update({ embeds: [newEmbed], components: buildComponents(sessionId) });
+        const newContainer = buildInviteComponents(targetUser, stats, topInviters, inviterId, interaction.user.id);
+        await btn.update({ components: [newContainer, buildButtonRow(sessionId)] });
       }
     });
 
     collector.on('end', async () => {
+      const finalContainer = buildInviteComponents(targetUser, stats, topInviters, inviterId, interaction.user.id);
       try {
-        await msg.edit({ components: buildComponents(sessionId, true) });
+        await msg.edit({ components: [finalContainer, buildButtonRow(sessionId, true)] });
       } catch {}
     });
   },

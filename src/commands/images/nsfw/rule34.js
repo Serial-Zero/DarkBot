@@ -3,8 +3,12 @@ import {
   ButtonBuilder,
   ButtonStyle,
   ComponentType,
-  EmbedBuilder,
+  ContainerBuilder,
+  MessageFlags,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
   SlashCommandBuilder,
+  TextDisplayBuilder,
 } from 'discord.js';
 
 /**
@@ -265,48 +269,48 @@ function pickRandomPost(posts) {
  * @param {string[]} tags
  * @returns {EmbedBuilder}
  */
-function createPostEmbed(post, tags) {
+function createPostComponents(post, tags) {
   const imageUrl = post.file_url ?? post.sample_url ?? post.preview_url ?? null;
   const ratingLabel = post.rating ? post.rating.toUpperCase() : 'UNKNOWN';
-  const postUrl = `https://rule34.xxx/index.php?page=post&s=view&id=${post.id}`;
 
-  const desc = [
+  const lines = [
+    '## Rule34 Result',
+    '',
     `**Tags:** ${tags.map((t) => `\`${t}\``).join(' ')}`,
     `**Rating:** ${ratingLabel}${typeof post.score === 'number' ? ` • **Score:** ${post.score}` : ''}`,
   ];
 
   if (post.source) {
-    desc.push(`**Source:** ${post.source}`);
+    lines.push(`**Source:** ${post.source}`);
   }
 
-  const embed = new EmbedBuilder()
-    .setColor(0x2b2d31)
-    .setTitle('Rule34 Result')
-    .setURL(postUrl)
-    .setDescription(desc.join('\n'));
+  const components = [
+    new TextDisplayBuilder().setContent(lines.join('\n')),
+  ];
 
   if (imageUrl) {
-    embed.setImage(imageUrl);
+    components.push(
+      new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small),
+      new TextDisplayBuilder().setContent(imageUrl),
+    );
   }
 
-  return embed;
+  return new ContainerBuilder().addComponents(...components);
 }
 
-function buildComponents(postUrl, sessionId, disabled = false) {
+function buildButtonRow(postUrl, sessionId, disabled = false) {
   const newBtn = new ButtonBuilder()
     .setCustomId(`${BTN_PREFIX}:${sessionId}:new`)
     .setLabel('New Image')
-    .setEmoji('🔄')
     .setStyle(ButtonStyle.Primary)
     .setDisabled(disabled);
 
   const linkBtn = new ButtonBuilder()
     .setLabel('View Post')
-    .setEmoji('🔗')
     .setStyle(ButtonStyle.Link)
     .setURL(postUrl);
 
-  return [new ActionRowBuilder().addComponents(newBtn, linkBtn)];
+  return new ActionRowBuilder().addComponents(newBtn, linkBtn);
 }
 
 const data = new SlashCommandBuilder()
@@ -378,11 +382,11 @@ async function execute(interaction) {
 
     const sessionId = interaction.id;
     const postUrl = `https://rule34.xxx/index.php?page=post&s=view&id=${post.id}`;
-    const embed = createPostEmbed(post, tags);
+    const container = createPostComponents(post, tags);
 
     const msg = await interaction.editReply({
-      embeds: [embed],
-      components: buildComponents(postUrl, sessionId),
+      flags: MessageFlags.IsComponentsV2,
+      components: [container, buildButtonRow(postUrl, sessionId)],
     });
 
     const collector = msg.createMessageComponentCollector({
@@ -409,18 +413,18 @@ async function execute(interaction) {
           return;
         }
         const newUrl = `https://rule34.xxx/index.php?page=post&s=view&id=${post.id}`;
-        const newEmbed = createPostEmbed(post, tags);
+        const newContainer = createPostComponents(post, tags);
         await btn.update({
-          embeds: [newEmbed],
-          components: buildComponents(newUrl, sessionId),
+          components: [newContainer, buildButtonRow(newUrl, sessionId)],
         });
       }
     });
 
     collector.on('end', async () => {
       const finalUrl = `https://rule34.xxx/index.php?page=post&s=view&id=${post.id}`;
+      const finalContainer = createPostComponents(post, tags);
       try {
-        await msg.edit({ components: buildComponents(finalUrl, sessionId, true) });
+        await msg.edit({ components: [finalContainer, buildButtonRow(finalUrl, sessionId, true)] });
       } catch {}
     });
   } catch (error) {
