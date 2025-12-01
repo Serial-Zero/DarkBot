@@ -5,8 +5,6 @@ import {
   ComponentType,
   ContainerBuilder,
   MessageFlags,
-  SeparatorBuilder,
-  SeparatorSpacingSize,
   SlashCommandBuilder,
   TextDisplayBuilder,
 } from 'discord.js';
@@ -284,18 +282,13 @@ function createPostComponents(post, tags) {
     lines.push(`**Source:** ${post.source}`);
   }
 
-  const components = [
-    new TextDisplayBuilder().setContent(lines.join('\n')),
-  ];
-
   if (imageUrl) {
-    components.push(
-      new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small),
-      new TextDisplayBuilder().setContent(imageUrl),
-    );
+    lines.push('', imageUrl);
   }
 
-  return new ContainerBuilder().addComponents(...components);
+  return new ContainerBuilder().addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(lines.join('\n')),
+  );
 }
 
 function buildButtonRow(postUrl, sessionId, disabled = false) {
